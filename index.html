@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📊 Classement - Les Pâtés Lorrains</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #1e1f22;
+      color: white;
+      margin: 0;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container {
+      display: flex;
+      gap: 2rem;
+      width: 100%;
+      max-width: 1200px;
+    }
+    .form, .preview {
+      flex: 1;
+      background: #2f3136;
+      padding: 20px;
+      border-radius: 12px;
+      overflow-y: auto;
+      max-height: 90vh;
+    }
+    input, textarea, button {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0 15px;
+      border-radius: 6px;
+      border: none;
+      background: #40444b;
+      color: white;
+      font-size: 1rem;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 10px;
+      display: block;
+    }
+    button {
+      background: #5865f2;
+      cursor: pointer;
+      border: none;
+    }
+    .embed-preview {
+      display: flex;
+      border-radius: 4px;
+      background-color: #2f3136;
+      border: 1px solid #202225;
+      margin-bottom: 1rem;
+      overflow: hidden;
+      max-width: 600px;
+    }
+    .embed-color-bar {
+      width: 4px;
+      border-top-left-radius: 4px;
+      border-bottom-left-radius: 4px;
+      background-color: #00b0f4;
+    }
+    .embed-content {
+      color: #dcddde;
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+      padding: 1rem;
+      width: 100%;
+    }
+    .embed-title {
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .embed-description {
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+      white-space: pre-wrap;
+    }
+    .embed-footer {
+      font-size: 0.75rem;
+      color: #72767d;
+      margin-top: 0.5rem;
+    }
+    .embed-image {
+      margin-top: 1rem;
+      border-radius: 4px;
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1>📊 Classement - Les Pâtés Lorrains</h1>
+  <div class="container">
+    <div class="form">
+      <label for="webhook">Webhook Discord</label>
+      <input type="text" id="webhook" placeholder="https://discord.com/api/webhooks/..." oninput="updateEmbed()" />
+
+      <label for="username">Nom du bot</label>
+      <input type="text" id="username" placeholder="Classement Bot" oninput="updateEmbed()" />
+
+      <label for="title">Titre de l'embed</label>
+      <input type="text" id="title" placeholder="📊 Classement - Les Pâtés Lorrains" oninput="updateEmbed()" />
+
+      <label for="ranking-text">Texte du classement</label>
+      <textarea id="ranking-text" rows="6" placeholder="1. Minou\n2. Paul\n3. Jean..." oninput="updateEmbed()"></textarea>
+
+      <label for="ranking-image">Lien de l'image (facultatif)</label>
+      <input type="text" id="ranking-image" placeholder="https://..." oninput="updateEmbed()" />
+
+      <label for="mention-users">Mentions membres (IDs séparés par des virgules)</label>
+      <input type="text" id="mention-users" placeholder="1234567890,0987654321" oninput="updateEmbed()" />
+
+      <label for="mention-roles">Mentions rôles (IDs séparés par des virgules)</label>
+      <input type="text" id="mention-roles" placeholder="1122334455,5566778899" oninput="updateEmbed()" />
+
+      <button onclick="sendEmbed()">📤 Envoyer sur Discord</button>
+      <button onclick="saveJSON()">💾 Enregistrer JSON</button>
+      <input type="file" accept=".json" onchange="loadJSON(event)" />
+    </div>
+
+    <div class="preview">
+      <h2>Aperçu de l'embed</h2>
+      <div id="mentions-preview"></div>
+      <div id="preview-area"></div>
+    </div>
+  </div>
+
+  <script>
+    let embed = {
+      title: "📊 Classement - Les Pâtés Lorrains",
+      description: "",
+      color: 0x00b0f4,
+      image: { url: "" },
+      footer: { text: "" }
+    };
+    let currentWebhook = "";
+    let currentUsername = "";
+    let mentionUsers = [];
+    let mentionRoles = [];
+
+    function getFrenchDateTime() {
+      const now = new Date();
+      return now.toLocaleString('fr-FR');
+    }
+
+    function updateEmbed() {
+      embed.title = document.getElementById("title").value;
+      embed.description = document.getElementById("ranking-text").value;
+      embed.image.url = document.getElementById("ranking-image").value;
+      embed.footer.text = getFrenchDateTime();
+      currentWebhook = document.getElementById("webhook").value;
+      currentUsername = document.getElementById("username").value;
+
+      mentionUsers = document.getElementById("mention-users").value.split(",").map(id => id.trim()).filter(Boolean);
+      mentionRoles = document.getElementById("mention-roles").value.split(",").map(id => id.trim()).filter(Boolean);
+
+      renderPreview();
+    }
+
+    function renderPreview() {
+      const preview = document.getElementById("preview-area");
+      const mentionsDiv = document.getElementById("mentions-preview");
+      preview.innerHTML = "";
+      mentionsDiv.innerHTML = "";
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "embed-preview";
+
+      const colorBar = document.createElement("div");
+      colorBar.className = "embed-color-bar";
+
+      const content = document.createElement("div");
+      content.className = "embed-content";
+      content.innerHTML = `
+        <div class="embed-title">${embed.title}</div>
+        <div class="embed-description">${embed.description}</div>
+        ${embed.image.url ? `<img class="embed-image" src="${embed.image.url}" />` : ''}
+        <div class="embed-footer">${embed.footer.text}</div>
+      `;
+
+      const combinedMentions = [
+        ...mentionUsers.map(id => `<@${id}>`),
+        ...mentionRoles.map(id => `<@&${id}>`)
+      ];
+      if (combinedMentions.length) {
+        mentionsDiv.innerHTML = "Mentions : " + combinedMentions.join(" ");
+      }
+
+      wrapper.appendChild(colorBar);
+      wrapper.appendChild(content);
+      preview.appendChild(wrapper);
+    }
+
+    async function sendEmbed() {
+      if (!currentWebhook) return alert("Veuillez entrer un webhook Discord valide.");
+
+      embed.footer.text = getFrenchDateTime();
+      const content = [
+        ...mentionUsers.map(id => `<@${id}>`),
+        ...mentionRoles.map(id => `<@&${id}>`)
+      ].join(" ");
+
+      const response = await fetch(currentWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: currentUsername || "Classement Bot",
+          content: content,
+          embeds: [embed]
+        })
+      });
+
+      alert(response.ok ? "✅ Envoyé avec succès !" : "❌ Erreur lors de l'envoi.");
+    }
+
+    function saveJSON() {
+      const data = {
+        webhook: currentWebhook,
+        username: currentUsername,
+        title: embed.title,
+        description: embed.description,
+        image: embed.image.url,
+        mentions_users: mentionUsers,
+        mentions_roles: mentionRoles
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "embed_config.json";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function loadJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = JSON.parse(e.target.result);
+        document.getElementById("webhook").value = data.webhook || "";
+        document.getElementById("username").value = data.username || "";
+        document.getElementById("title").value = data.title || "";
+        document.getElementById("ranking-text").value = data.description || "";
+        document.getElementById("ranking-image").value = data.image || "";
+        document.getElementById("mention-users").value = (data.mentions_users || []).join(",");
+        document.getElementById("mention-roles").value = (data.mentions_roles || []).join(",");
+        updateEmbed();
+      };
+      reader.readAsText(file);
+    }
+
+    updateEmbed(); // Initialisation
+  </script>
+</body>
+</html>

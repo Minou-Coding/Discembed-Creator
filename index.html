@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>📊 Classement - Les Pâtés Lorrains</title>
   <style>
+    /* Styles inchangés pour garder la mise en page actuelle */
     body {
       font-family: 'Segoe UI', sans-serif;
       background-color: #1e1f22;
@@ -47,7 +48,6 @@
     button {
       background: #5865f2;
       cursor: pointer;
-      border: none;
     }
     .embed-preview {
       display: flex;
@@ -114,6 +114,12 @@
       <label for="ranking-image">Lien de l'image (facultatif)</label>
       <input type="text" id="ranking-image" placeholder="https://..." oninput="updateEmbed()" />
 
+      <label for="image-upload">Ou charge une image depuis ton PC</label>
+      <input type="file" id="image-upload" accept="image/*" onchange="uploadImage(event)" />
+
+      <label for="imgbb-key">Clé API ImgBB</label>
+      <input type="text" id="imgbb-key" placeholder="Ta clé API ImgBB ici" />
+
       <label for="mention-users">Mentions membres (IDs séparés par des virgules)</label>
       <input type="text" id="mention-users" placeholder="1234567890,0987654321" oninput="updateEmbed()" />
 
@@ -146,8 +152,7 @@
     let mentionRoles = [];
 
     function getFrenchDateTime() {
-      const now = new Date();
-      return now.toLocaleString('fr-FR');
+      return new Date().toLocaleString('fr-FR');
     }
 
     function updateEmbed() {
@@ -200,8 +205,8 @@
 
     async function sendEmbed() {
       if (!currentWebhook) return alert("Veuillez entrer un webhook Discord valide.");
-
       embed.footer.text = getFrenchDateTime();
+
       const content = [
         ...mentionUsers.map(id => `<@${id}>`),
         ...mentionRoles.map(id => `<@&${id}>`)
@@ -228,7 +233,8 @@
         description: embed.description,
         image: embed.image.url,
         mentions_users: mentionUsers,
-        mentions_roles: mentionRoles
+        mentions_roles: mentionRoles,
+        imgbb_key: document.getElementById("imgbb-key").value.trim()
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -254,9 +260,47 @@
         document.getElementById("ranking-image").value = data.image || "";
         document.getElementById("mention-users").value = (data.mentions_users || []).join(",");
         document.getElementById("mention-roles").value = (data.mentions_roles || []).join(",");
+        document.getElementById("imgbb-key").value = data.imgbb_key || "";
         updateEmbed();
       };
       reader.readAsText(file);
+    }
+
+    async function uploadImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const imgbbKeyInput = document.getElementById("imgbb-key").value.trim();
+      if (!imgbbKeyInput) return alert("❌ Veuillez saisir une clé API ImgBB.");
+
+      const reader = new FileReader();
+      reader.onload = async function () {
+        const base64Image = reader.result.split(',')[1];
+        const formData = new FormData();
+        formData.append('image', base64Image);
+
+        try {
+          const response = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKeyInput}`, {
+            method: 'POST',
+            body: formData
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            const imageUrl = data.data.url;
+            document.getElementById('ranking-image').value = imageUrl;
+            updateEmbed();
+            alert("✅ Image hébergée avec succès !");
+          } else {
+            alert("❌ Erreur lors de l'upload.");
+          }
+        } catch (error) {
+          console.error(error);
+          alert("❌ Erreur réseau ou imgbb indisponible.");
+        }
+      };
+
+      reader.readAsDataURL(file);
     }
 
     updateEmbed(); // Initialisation
